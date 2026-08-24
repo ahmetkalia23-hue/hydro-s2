@@ -24,6 +24,7 @@ import geopandas as gpd
 import httpx
 import rasterio
 from rasterio.transform import from_bounds as transform_from_bounds
+from rasterio import features as rfeatures
 from rasterio.warp import reproject, Resampling, calculate_default_transform
 from shapely.geometry import mapping
 from shapely.ops import unary_union
@@ -35,7 +36,7 @@ STATS   = r"F:\Alua\Hydrosat\indices_2026_v2\hydrosat_stats_all.parquet"
 SITE    = pathlib.Path(r"F:\Alua\Hydrosat\hydro-s2-site\site")
 CHIPS   = SITE / "data" / "chips"
 DT_FROM, DT_TO = "2026-03-01", "2026-08-24"
-PAD     = 120.0   # контекст вокруг поля, м
+PAD     = 30.0    # запас окна вокруг поля, м (чип обрезается по границе альфой)
 RES     = 10.0
 WORKERS = 14
 CLEAR_MIN_CHIP = 80.0   # чипы рендерим и для слегка облачных — видно глазами
@@ -73,21 +74,22 @@ def search_scenes(geom_wgs):
     return out
 
 
-def to_png_rgb(rgb, path):
+def to_png_rgb(rgb, path, alpha):
     img = (np.clip(rgb, 0, 1) * 255).astype("uint8")
-    Image.fromarray(img).save(path, optimize=True)
+    rgba = np.dstack([img, alpha])
+    Image.fromarray(rgba, "RGBA").save(path, optimize=True)
 
 
-def to_png_cmap(a, vmin, vmax, cmap, path, alpha=None):
+def to_png_cmap(a, vmin, vmax, cmap, path, alpha):
     x = np.clip((a - vmin) / (vmax - vmin + 1e-12), 0, 1)
     rgba = (cmap(x) * 255).astype("uint8")
-    if alpha is not None:
-        rgba[..., 3] = alpha
+    rgba[..., 3] = alpha
     Image.fromarray(rgba).save(path, optimize=True)
 
 
-def reproj_stack(arrs, src_crs, src_bnds):
-    """Стек массивов UTM → EPSG:4326; возвращает (стек, bounds4326)."""
+def reproj_stack(arrs, src_crs, src_bnds, geom_wgs):
+    """Стек массивов UTM → EPSG:4326; возвращает (стек, bounds4326, alpha-маска
+    по границе поля: 255 внутри полигона, 0 снаружи — чипы обрезаны по полю)."""
     h, w = arrs[0].shape
     src_tr = transform_from_bounds(*src_bnds, w, h)
     dst_tr, dw, dh = calculate_default_transform(src_crs, "EPSG:4326", w, h,
@@ -99,9 +101,11 @@ def reproj_stack(arrs, src_crs, src_bnds):
                   dst_transform=dst_tr, dst_crs="EPSG:4326",
                   resampling=Resampling.bilinear)
         out.append(d)
+    alpha = (rfeatures.rasterize([(geom_wgs, 1)], out_shape=(dh, dw),
+                                 transform=dst_tr, fill=0, dtype="uint8") * 255)
     west = dst_tr.c; north = dst_tr.f
     east = west + dst_tr.a * dw; south = north + dst_tr.e * dh
-    return out, [south, west, north, east]
+    return out, [south, west, north, east], alpha
 
 
 def process_scene(sc, jobs_by_tiledate, fields_utm_cache):
@@ -137,19 +141,23 @@ def process_scene(sc, jobs_by_tiledate, fields_utm_cache):
                     raw = fi._read_block(fi.mpc_sign(sc["assets"][name]), bnds, H, W,
                                          Resampling.bilinear)
                     b[name] = (raw - off) / fi.SCALE
-                (blue, green, red, nir, swir), bounds = reproj_stack(
+                (blue, green, red, nir, swir), bounds, alpha = reproj_stack(
                     [b["blue"], b["green"], b["red"], b["nir"], b["swir16"]],
-                    scene_crs, bnds)
+                    scene_crs, bnds, geom_wgs)
+                if not alpha.any():
+                    continue
                 eps = 1e-10
                 ndvi = (nir - red) / (nir + red + eps)
                 ndmi = (nir - swir) / (nir + swir + eps)
-                to_png_rgb(np.dstack([red, green, blue]) / 0.30, out_dir / f"{date}_natural.png")
-                to_png_rgb(np.dstack([nir, red, green]) / 0.45, out_dir / f"{date}_false.png")
-                to_png_cmap(ndvi, 0.0, 1.0, CM_NDVI, out_dir / f"{date}_ndvi.png")
-                lo, hi = np.percentile(ndvi, [2, 98])
+                inside = alpha > 0
+                to_png_rgb(np.dstack([red, green, blue]) / 0.30, out_dir / f"{date}_natural.png", alpha)
+                to_png_rgb(np.dstack([nir, red, green]) / 0.45, out_dir / f"{date}_false.png", alpha)
+                to_png_cmap(ndvi, 0.0, 1.0, CM_NDVI, out_dir / f"{date}_ndvi.png", alpha)
+                # растяжка контраста считается ТОЛЬКО по пикселям внутри поля
+                lo, hi = np.percentile(ndvi[inside], [2, 98])
                 to_png_cmap(ndvi, float(lo), float(hi) + 1e-6, CM_NDVI,
-                            out_dir / f"{date}_ndvi_contrast.png")
-                to_png_cmap(ndmi, -0.4, 0.6, CM_NDMI, out_dir / f"{date}_ndmi.png")
+                            out_dir / f"{date}_ndvi_contrast.png", alpha)
+                to_png_cmap(ndmi, -0.4, 0.6, CM_NDMI, out_dir / f"{date}_ndmi.png", alpha)
                 bf = out_dir / "_bounds.json"
                 if not bf.exists():
                     bf.write_text(json.dumps({"bounds": bounds}), encoding="utf-8")
