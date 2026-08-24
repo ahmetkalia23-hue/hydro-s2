@@ -12,11 +12,11 @@ ndvi (RdYlGn 0..1), ndvi_contrast (растяжка 2-98% внутри окна)
 Запуск: C:\...\envs\super\python.exe F:\Alua\Hydrosat\hydro-s2-site\build\render_chips.py
 """
 from __future__ import annotations
-import sys, json, time, pathlib
+import os, sys, json, time, pathlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-sys.path.insert(0, r"C:\Users\a.akhmetkali\PycharmProjects\PythonProject1")
-import field_indices as fi
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import mpc as fi
 
 import numpy as np
 import pandas as pd
@@ -33,9 +33,10 @@ from shapely.ops import unary_union
 from PIL import Image
 from matplotlib import cm
 
-SHAPE   = r"F:\Alua\Hydrosat\Поля_Новые_Конечные\Поля_Новые_Конечные.shp"
-STATS   = r"F:\Alua\Hydrosat\indices_2026_v2\hydrosat_stats_all.parquet"
-SITE    = pathlib.Path(r"F:\Alua\Hydrosat\hydro-s2-site\site")
+ROOT    = pathlib.Path(__file__).resolve().parent.parent
+SHAPE   = str(ROOT / "data" / "fields" / "fields.shp")
+STATS   = str(ROOT / "data" / "stats.parquet")
+SITE    = ROOT / "site"
 CHIPS   = SITE / "data" / "chips"
 DT_FROM, DT_TO = "2026-03-01", "2026-08-24"
 PAD     = 30.0    # запас окна вокруг поля, м (чип обрезается по границе альфой)

@@ -12,9 +12,10 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 
-V2   = pathlib.Path(r"F:\Alua\Hydrosat\indices_2026_v2")
-SITE = pathlib.Path(r"F:\Alua\Hydrosat\hydro-s2-site\site")
-SHAPE = r"F:\Alua\Hydrosat\Поля_Новые_Конечные\Поля_Новые_Конечные.shp"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+DATA = ROOT / "data"
+SITE = ROOT / "site"
+SHAPE = str(DATA / "fields" / "fields.shp")
 
 INDICES = ["NDVI", "EVI", "EVI2", "SAVI", "MSAVI", "OSAVI", "GNDVI", "GCI", "NDWI",
            "NDRE", "RECI", "NDMI", "NDTI", "STI", "NDSVI", "BSI"]
@@ -59,8 +60,8 @@ def main():
     gdf = gdf[gdf.geometry.notna()].reset_index(drop=True)
     gdf["geometry"] = gdf.geometry.make_valid()
     gdf["field_id"] = range(1, len(gdf) + 1)
-    stats = pd.read_parquet(V2 / "hydrosat_stats_all.parquet")
-    hist = pd.read_parquet(V2 / "hydrosat_histograms.parquet")
+    stats = pd.read_parquet(DATA / "stats.parquet")
+    hist = pd.read_parquet(DATA / "histograms.parquet")
 
     # fields.geojson
     out = gdf[["field_id", "Cad_number", "Culture", "Area_ha", "type_irrag", "geometry"]].copy()

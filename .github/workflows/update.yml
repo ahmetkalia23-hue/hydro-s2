@@ -1,0 +1,73 @@
+name: update-data
+
+# Ежедневный инкремент: досчитываются только снимки, появившиеся после
+# последней даты в data/stats.parquet. Если новых нет — прогон пустой.
+# 22:00 UTC = 03:00 по Алматы.
+on:
+  schedule:
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+    inputs:
+      from_date:
+        description: "Пересчитать с даты (ГГГГ-ММ-ДД), пусто = только новое"
+        required: false
+      dry_run:
+        description: "Только показать новые даты, без расчёта"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Установить зависимости
+        run: pip install -r requirements.txt
+
+      - name: Досчитать новые даты
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.from_date }}" ]; then ARGS="$ARGS --from ${{ inputs.from_date }}"; fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          python build/update.py $ARGS
+
+      - name: Закоммитить результат
+        id: commit
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "новых данных нет — коммит не нужен"
+            echo "changed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          git config user.name  "hydro-s2 bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          LAST=$(python -c "import pandas as pd; print(max(pd.read_parquet('data/stats.parquet').date))")
+          git commit -m "data: обновление по $LAST"
+          git push
+          echo "changed=true" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: update
+    if: needs.update.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
