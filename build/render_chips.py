@@ -31,7 +31,7 @@ from scipy import ndimage as ndi
 from shapely.geometry import mapping
 from shapely.ops import unary_union
 from PIL import Image
-from matplotlib import cm
+import matplotlib   # colormaps для NDVI/NDMI (RdYlGn, BrBG)
 
 ROOT    = pathlib.Path(__file__).resolve().parent.parent
 SHAPE   = str(ROOT / "data" / "fields" / "fields.shp")
@@ -46,8 +46,8 @@ CLEAR_MIN_CHIP = 80.0   # чипы рендерим и для слегка об�
 LAYERS  = ["natural", "false", "ndvi", "ndvi_contrast", "ndmi"]
 BANDS   = {"blue": "B02", "green": "B03", "red": "B04", "nir": "B08", "swir16": "B11"}
 
-CM_NDVI = cm.get_cmap("RdYlGn")
-CM_NDMI = cm.get_cmap("BrBG")
+CM_NDVI = matplotlib.colormaps["RdYlGn"]
+CM_NDMI = matplotlib.colormaps["BrBG"]
 
 
 def search_scenes(geom_wgs):
