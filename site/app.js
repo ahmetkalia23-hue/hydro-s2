@@ -10,7 +10,7 @@ const GRAD = {
 const LAYER_ORDER = ["ndvi","ndvi_contrast","ndmi","false","natural"];
 
 let META, FIELDS, SERIES, CHIPS;
-let map, baseLayers = {}, chipLayers = [], fieldLayer;
+let map, baseLayers = {}, chipLayers = [], fieldLayer, fieldHalo;
 let curLayer = "ndvi", curDate = null, selField = null, chipOpacity = .96;
 let dateList = [];
 const histCache = {};
@@ -43,15 +43,18 @@ function initMap(){
   baseLayers.esri = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"Esri World Imagery"});
   baseLayers.osm  = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"});
   baseLayers.esri.addTo(map);
+  // тёмное «гало» под контуром — граница читается на любой подложке
+  fieldHalo = L.geoJSON(FIELDS,{interactive:false,
+    style: f => ({color:"#0b1113", weight: selField===f.properties.field_id ? 8 : 5,
+                  opacity:.55, fill:false})}).addTo(map);
   fieldLayer = L.geoJSON(FIELDS,{
-    style: f => ({color: selField===f.properties.field_id ? "#6fc79b" : "#9fd9bd",
-                  weight: selField===f.properties.field_id ? 2.5 : 1.4,
-                  fillOpacity: 0, opacity:.95}),
+    style: fieldStyle,
     onEachFeature: (f,l)=>{
       const p = f.properties;
       l.bindTooltip(`№${p.field_id} · ${CUL_RU[p.Culture]||p.Culture} · ${p.Area_ha} га`,
                     {sticky:true, className:"fld-tip"});
-      l.on("click", ()=>selectField(p.field_id));
+      l.on("click", ()=>selectField(p.field_id));   // клик по полю: выбрать
+                                                     // + значение пикселя (map click)
     }
   }).addTo(map);
   map.fitBounds(fieldLayer.getBounds().pad(0.08));
@@ -227,12 +230,26 @@ function updateFieldListValues(){
     sp.title = r ? `${idx} на ${fmtD(r.date)} · чисто ${r.clear}%` : "нет данных на эту дату";
   });
 }
+function fieldStyle(f){
+  const on = selField===f.properties.field_id;
+  return {color: on ? "#7ef0bd" : "#ffffff", weight: on ? 4 : 2.2,
+          opacity: on ? 1 : .8, dashArray: on ? "9 5" : null,
+          fill:true, fillColor:"#7ef0bd", fillOpacity: on ? .14 : 0,
+          className: on ? "fld-sel" : ""};
+}
 function selectField(fid, zoom){
   selField = fid;
   document.querySelectorAll(".f-item").forEach(x=>x.classList.remove("sel"));
   const it = $("fi-"+fid); if(it) it.classList.add("sel");
-  fieldLayer.setStyle(f=>({color:f.properties.field_id===fid?"#6fc79b":"#9fd9bd",
-                           weight:f.properties.field_id===fid?2.5:1.4,fillOpacity:0}));
+  fieldLayer.setStyle(fieldStyle);
+  fieldHalo.setStyle(f=>({color:"#0b1113", weight:f.properties.field_id===fid?8:5,
+                          opacity:.55, fill:false}));
+  // className в setStyle Leaflet не применяет — класс анимации ставим вручную
+  fieldLayer.eachLayer(l=>{
+    const el = l.getElement();
+    if(el) el.classList.toggle("fld-sel", l.feature.properties.field_id===fid);
+  });
+  fieldLayer.eachLayer(l=>{ if(l.feature.properties.field_id===fid) l.bringToFront(); });
   if(zoom){
     const lyr = fieldLayer.getLayers().find(l=>l.feature.properties.field_id===fid);
     if(lyr) map.fitBounds(lyr.getBounds().pad(0.6));

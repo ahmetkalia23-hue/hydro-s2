@@ -101,8 +101,11 @@ def reproj_stack(arrs, src_crs, src_bnds, geom_wgs):
                   dst_transform=dst_tr, dst_crs="EPSG:4326",
                   resampling=Resampling.bilinear)
         out.append(d)
+    # all_touched=True — краевые пиксели, задетые границей, тоже закрашиваются,
+    # иначе вдоль контура остаётся незалитая «лесенка»
     alpha = (rfeatures.rasterize([(geom_wgs, 1)], out_shape=(dh, dw),
-                                 transform=dst_tr, fill=0, dtype="uint8") * 255)
+                                 transform=dst_tr, fill=0, dtype="uint8",
+                                 all_touched=True) * 255)
     west = dst_tr.c; north = dst_tr.f
     east = west + dst_tr.a * dw; south = north + dst_tr.e * dh
     return out, [south, west, north, east], alpha
