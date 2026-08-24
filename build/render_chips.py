@@ -26,6 +26,8 @@ import rasterio
 from rasterio.transform import from_bounds as transform_from_bounds
 from rasterio import features as rfeatures
 from rasterio.warp import reproject, Resampling, calculate_default_transform
+from affine import Affine
+from scipy import ndimage as ndi
 from shapely.geometry import mapping
 from shapely.ops import unary_union
 from PIL import Image
@@ -87,25 +89,45 @@ def to_png_cmap(a, vmin, vmax, cmap, path, alpha):
     Image.fromarray(rgba).save(path, optimize=True)
 
 
+SS = 2   # супер-сэмплинг выходной сетки (мягкий край без потери пиксельной структуры)
+AA = 4   # подсетка для сглаживания альфы (дробное покрытие пикселя полигоном)
+
+
 def reproj_stack(arrs, src_crs, src_bnds, geom_wgs):
-    """Стек массивов UTM → EPSG:4326; возвращает (стек, bounds4326, alpha-маска
-    по границе поля: 255 внутри полигона, 0 снаружи — чипы обрезаны по полю)."""
+    """Стек массивов UTM → EPSG:4326; возвращает (стек, bounds4326, alpha).
+
+    Край чипа совпадает с границей поля точно: альфа считается как ДОЛЯ площади
+    пикселя внутри полигона (растеризация на подсетке AA×AA), поэтому нет ни
+    ступенчатых пустот внутри, ни пикселей, торчащих наружу. Значения у самой
+    границы заполняются ближайшими валидными (иначе край красится нулями)."""
     h, w = arrs[0].shape
     src_tr = transform_from_bounds(*src_bnds, w, h)
-    dst_tr, dw, dh = calculate_default_transform(src_crs, "EPSG:4326", w, h,
-                                                 *src_bnds)
+    dst_tr, dw, dh = calculate_default_transform(src_crs, "EPSG:4326", w, h, *src_bnds)
+    dw2, dh2 = dw * SS, dh * SS
+    tr2 = dst_tr * Affine.scale(1.0 / SS)
+
     out = []
     for a in arrs:
-        d = np.zeros((dh, dw), dtype="float32")
+        d = np.zeros((dh2, dw2), dtype="float32")
         reproject(a, d, src_transform=src_tr, src_crs=src_crs,
-                  dst_transform=dst_tr, dst_crs="EPSG:4326",
-                  resampling=Resampling.bilinear)
+                  dst_transform=tr2, dst_crs="EPSG:4326",
+                  resampling=Resampling.nearest)
         out.append(d)
-    # all_touched=True — краевые пиксели, задетые границей, тоже закрашиваются,
-    # иначе вдоль контура остаётся незалитая «лесенка»
-    alpha = (rfeatures.rasterize([(geom_wgs, 1)], out_shape=(dh, dw),
-                                 transform=dst_tr, fill=0, dtype="uint8",
-                                 all_touched=True) * 255)
+
+    # заполнить невалидные (нули за пределами прочитанного окна) ближайшими
+    valid = out[2] > 1e-6              # red — индикатор наличия данных
+    if not valid.all() and valid.any():
+        _, ind = ndi.distance_transform_edt(~valid, return_distances=True,
+                                            return_indices=True)
+        out = [a[tuple(ind)] for a in out]
+
+    # альфа = доля пикселя внутри полигона (0..255), край мягкий и точный
+    sub = rfeatures.rasterize([(geom_wgs, 1)], out_shape=(dh2 * AA, dw2 * AA),
+                              transform=tr2 * Affine.scale(1.0 / AA),
+                              fill=0, dtype="uint8")
+    cov = sub.reshape(dh2, AA, dw2, AA).mean(axis=(1, 3))
+    alpha = np.clip(np.round(cov * 255), 0, 255).astype("uint8")
+
     west = dst_tr.c; north = dst_tr.f
     east = west + dst_tr.a * dw; south = north + dst_tr.e * dh
     return out, [south, west, north, east], alpha
@@ -152,7 +174,7 @@ def process_scene(sc, jobs_by_tiledate, fields_utm_cache):
                 eps = 1e-10
                 ndvi = (nir - red) / (nir + red + eps)
                 ndmi = (nir - swir) / (nir + swir + eps)
-                inside = alpha > 0
+                inside = alpha > 200   # только уверенно внутренние пиксели
                 to_png_rgb(np.dstack([red, green, blue]) / 0.30, out_dir / f"{date}_natural.png", alpha)
                 to_png_rgb(np.dstack([nir, red, green]) / 0.45, out_dir / f"{date}_false.png", alpha)
                 to_png_cmap(ndvi, 0.0, 1.0, CM_NDVI, out_dir / f"{date}_ndvi.png", alpha)
