@@ -60,11 +60,6 @@ function initMap(){
   map.fitBounds(fieldLayer.getBounds().pad(0.08));
   document.querySelectorAll("#base-btns .chip").forEach(b=>b.onclick=()=>setBase(b.dataset.base,b));
   loadWayback();
-  map.on("click", e=>{
-    const r = samplePixel(e.latlng);
-    if(r) L.popup({className:"px-pop", closeButton:false, offset:[0,-4]})
-           .setLatLng(e.latlng).setContent(r.html).openOn(map);
-  });
   const op = $("opa");
   op.oninput = ()=>{ chipOpacity = op.value/100; $("opa-v").textContent = op.value+"%";
                      chipLayers.forEach(l=>l.setOpacity(chipOpacity)); };
@@ -121,45 +116,6 @@ function refreshChips(){
   if(selField) showCard(selField);
 }
 
-/* значение пикселя по клику (ВП-14): цвет из PNG → значение через палитру */
-function nearestLut(lut, r, g, b){
-  let bi=0, bd=1e9;
-  for(let i=0;i<lut.length;i++){
-    const d=(lut[i][0]-r)**2+(lut[i][1]-g)**2+(lut[i][2]-b)**2;
-    if(d<bd){bd=d;bi=i;}
-  }
-  return {i:bi, dist:Math.sqrt(bd)};
-}
-function samplePixel(latlng){
-  const lm = META.layers[curLayer];
-  for(let k=chipLayers.length-1;k>=0;k--){
-    const ov = chipLayers[k], b = ov.getBounds();
-    if(!b.contains(latlng)) continue;
-    const img = ov.getElement();
-    if(!img || !img.complete || !img.naturalWidth) continue;
-    const w=img.naturalWidth, h=img.naturalHeight;
-    const x=Math.floor((latlng.lng-b.getWest())/(b.getEast()-b.getWest())*w);
-    const y=Math.floor((b.getNorth()-latlng.lat)/(b.getNorth()-b.getSouth())*h);
-    if(x<0||y<0||x>=w||y>=h) continue;
-    const c=document.createElement("canvas"); c.width=w; c.height=h;
-    const ctx=c.getContext("2d",{willReadFrequently:true}); ctx.drawImage(img,0,0);
-    const p=ctx.getImageData(x,y,1,1).data;
-    if(p[3]===0) continue;                       // вне границы поля
-    const f=FIELDS.features.find(f=>f.properties.field_id===ov.fid);
-    const nm=f?`Поле №${ov.fid} · ${CUL_RU[f.properties.Culture]||f.properties.Culture}`:`Поле №${ov.fid}`;
-    if(!lm.legend){                              // RGB-композит — значения нет
-      return {html:`<b>${nm}</b><div class="sub">${lm.name} · ${fmtD(ov.chipDate)} · RGB ${p[0]},${p[1]},${p[2]}</div>`};
-    }
-    const lut=META.cmaps[lm.legend.cmap];
-    const {i,dist}=nearestLut(lut,p[0],p[1],p[2]);
-    let vmin=lm.legend.min, vmax=lm.legend.max, note="";
-    if(vmin===null){ vmin=0; vmax=1; note=" (доля диапазона окна)"; }
-    const val=vmin+(vmax-vmin)*i/255;
-    const label=curLayer==="ndmi"?"NDMI":"NDVI";
-    return {html:`<b>${label} ${val.toFixed(3)}</b><div class="sub">${nm}<br>${fmtD(ov.chipDate)} · пиксель 10 м${note}${dist>12?" · цвет приблизительный":""}</div>`};
-  }
-  return null;
-}
 function refreshLegend(){
   const lm = META.layers[curLayer], lg = $("legend");
   if(lm.legend && lm.legend.min!==null){

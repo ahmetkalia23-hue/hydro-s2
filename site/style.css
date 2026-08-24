@@ -52,11 +52,6 @@ select{background:var(--panel-solid);border:1px solid var(--line);color:var(--in
   user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
 .leaflet-container img{outline:none!important}
 .leaflet-interactive:focus{outline:none}
-.px-pop .leaflet-popup-content-wrapper{background:var(--panel-solid);color:var(--ink);border:1px solid var(--line);border-radius:8px}
-.px-pop .leaflet-popup-tip{background:var(--panel-solid);border:1px solid var(--line)}
-.px-pop .leaflet-popup-content{margin:9px 12px;font-family:var(--sans);font-size:12.5px}
-.px-pop b{font-family:var(--mono);color:var(--acc);font-size:14px}
-.px-pop .sub{color:var(--ink3);font-size:11.5px;margin-top:3px}
 .chip-date{margin-top:6px;font-size:11.5px;color:var(--warn);font-family:var(--mono)}
 
 .f-list{overflow:auto;margin:0 -6px;padding:0 6px}
