@@ -27,6 +27,10 @@ async function boot(){
     fetch("data/chips_index.json").then(r=>r.json()),
   ]);
   $("updated").textContent = "данные: " + META.period[0] + " … " + META.period[1];
+  // легенда — только подпись: клик не скрывает линии
+  Chart.defaults.plugins.legend.onClick = () => {};
+  Chart.defaults.plugins.legend.onHover = null;
+  Chart.defaults.plugins.legend.labels.boxWidth = 14;
   const ds = new Set();
   Object.values(CHIPS).forEach(c => c.dates.forEach(d => ds.add(d)));
   dateList = [...ds].sort();
