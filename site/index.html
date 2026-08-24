@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hydrosat · Мониторинг орошаемых полей</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo">◧</span>
+    <span class="name">Hydrosat</span>
+    <span class="sub">спутниковый мониторинг орошения · пилот 24 поля</span>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" data-tab="map">Карта</button>
+    <button class="tab" data-tab="hist">Гистограммы</button>
+    <button class="tab" data-tab="series">Ряды</button>
+  </nav>
+  <div class="upd" id="updated"></div>
+</header>
+
+<main>
+  <!-- ── КАРТА ── -->
+  <section id="view-map" class="view">
+    <div id="map"></div>
+
+    <div class="panel layers-panel">
+      <div class="p-title">Слой Sentinel-2</div>
+      <div class="chip-row" id="layer-btns"></div>
+      <div class="p-title" style="margin-top:10px">Дата съёмки</div>
+      <div class="date-nav">
+        <button id="d-prev" title="Предыдущая дата">‹</button>
+        <select id="d-select"></select>
+        <button id="d-next" title="Следующая дата">›</button>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="interp" id="interp"></div>
+      <div class="p-title" style="margin-top:10px">Подложка</div>
+      <div class="chip-row" id="base-btns">
+        <button class="chip active" data-base="esri">Esri снимок</button>
+        <button class="chip" data-base="osm">OSM</button>
+        <button class="chip" data-base="wayback">Wayback</button>
+      </div>
+      <select id="wayback-sel" class="hidden" title="Версия архива Esri Wayback"></select>
+    </div>
+
+    <div class="panel fields-panel">
+      <div class="p-title">Поля <span id="f-count"></span></div>
+      <div class="f-list" id="f-list"></div>
+    </div>
+
+    <div class="panel field-card hidden" id="f-card"></div>
+  </section>
+
+  <!-- ── ГИСТОГРАММЫ ── -->
+  <section id="view-hist" class="view hidden">
+    <div class="controls">
+      <label>Поле <select id="h-field"></select></label>
+      <label>Индекс <select id="h-index"></select></label>
+      <label>Дата
+        <span class="date-nav"><button id="h-prev">‹</button><select id="h-date"></select><button id="h-next">›</button></span>
+      </label>
+      <label class="cmp"><input type="checkbox" id="h-compare"> сравнить с предыдущей датой</label>
+    </div>
+    <div class="hist-meta" id="h-meta"></div>
+    <div class="chart-box"><canvas id="h-chart"></canvas></div>
+    <div class="interp" id="h-interp" style="max-width:70ch"></div>
+    <div class="chart-box" style="margin-top:18px">
+      <div class="p-title">Динамика распределения за сезон (p05–p95, p25–p75, медиана)</div>
+      <canvas id="h-season"></canvas>
+    </div>
+  </section>
+
+  <!-- ── РЯДЫ ── -->
+  <section id="view-series" class="view hidden">
+    <div class="controls">
+      <label>Поле <select id="s-field"></select></label>
+      <label>Индекс <select id="s-index"></select></label>
+    </div>
+    <div class="chart-box"><canvas id="s-chart"></canvas></div>
+    <div class="chart-box" style="margin-top:18px">
+      <div class="p-title">Коэффициент вариации (равномерность полива: рост CV = часть поля выпадает)</div>
+      <canvas id="s-cv"></canvas>
+    </div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

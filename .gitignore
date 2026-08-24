@@ -1,0 +1,4 @@
+.gh_token_tmp
+build/chips_log.txt
+build/*.log
+__pycache__/
