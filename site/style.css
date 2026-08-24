@@ -59,7 +59,13 @@ select{background:var(--panel-solid);border:1px solid var(--line);color:var(--in
 .f-item:hover{background:#ffffff10}
 .f-item.sel{background:var(--acc-dim)}
 .f-item .cul{width:9px;height:9px;border-radius:3px;flex:none}
-.f-item .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.f-item{align-items:flex-start}
+.f-item .cul{margin-top:4px}
+.f-item .nm{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.f-item .ln1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.f-item .cad{font-family:var(--mono);font-size:10.5px;color:var(--ink3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.f-item.sel .cad{color:var(--acc)}
 .f-item .v{font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
 .f-item .flag{color:var(--warn);font-size:12px}
 
@@ -81,6 +87,9 @@ select{background:var(--panel-solid);border:1px solid var(--line);color:var(--in
 .controls .cmp{flex-direction:row;align-items:center;color:var(--ink2);font-size:13px}
 .chart-box{background:var(--panel-solid);border:1px solid var(--line);border-radius:10px;padding:16px;position:relative}
 .chart-box canvas{max-height:340px}
+.fcap{font-size:14px;color:var(--ink2);margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.fcap b{font-weight:600;color:var(--ink)}
+.fcap .cadv{font-family:var(--mono);font-size:13px;color:var(--acc)}
 .hist-meta{font-family:var(--mono);font-size:12.5px;color:var(--ink2);margin-bottom:8px}
 .hist-meta b{color:var(--acc)}
 

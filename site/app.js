@@ -173,7 +173,10 @@ function initFieldList(){
     el.className = "f-item"; el.id = "fi-"+p.field_id;
     const flag = META.implausible.some(x=>x.field_id===p.field_id) ? `<span class="flag" title="есть даты с физически неправдоподобными значениями — проверить границу">⚠</span>` : "";
     el.innerHTML = `<span class="cul" style="background:${CUL_COLOR[p.Culture]||'#888'}"></span>
-      <span class="nm">№${p.field_id} ${CUL_RU[p.Culture]||p.Culture} · ${p.Area_ha} га</span>${flag}
+      <span class="nm">
+        <span class="ln1">№${p.field_id} ${CUL_RU[p.Culture]||p.Culture} · ${p.Area_ha} га</span>
+        <span class="cad" title="${p.Cad_number}">${p.Cad_number}</span>
+      </span>${flag}
       <span class="v" data-fid="${p.field_id}"></span>`;
     el.onclick = ()=>{ selectField(p.field_id, true); };
     list.appendChild(el);
@@ -210,6 +213,10 @@ function selectField(fid, zoom){
     if(el) el.classList.toggle("fld-sel", l.feature.properties.field_id===fid);
   });
   fieldLayer.eachLayer(l=>{ if(l.feature.properties.field_id===fid) l.bringToFront(); });
+  // вкладки графиков следуют за выбором на карте
+  const hf=$("h-field"), sf=$("s-field");
+  if(hf) hf.value = fid;
+  if(sf) sf.value = fid;
   if(zoom){
     const lyr = fieldLayer.getLayers().find(l=>l.feature.properties.field_id===fid);
     if(lyr) map.fitBounds(lyr.getBounds().pad(0.6));
@@ -261,7 +268,16 @@ function switchTab(name){
 function fillFieldSelect(sel){
   FIELDS.features.forEach(f=>{const p=f.properties;
     const o=document.createElement("option");o.value=p.field_id;
-    o.textContent=`№${p.field_id} · ${CUL_RU[p.Culture]||p.Culture} · ${p.Area_ha} га`;sel.appendChild(o);});
+    o.textContent=`№${p.field_id} · ${CUL_RU[p.Culture]||p.Culture} · ${p.Area_ha} га · ${p.Cad_number}`;
+    sel.appendChild(o);});
+}
+/* подпись выбранного поля над графиками (вкладки «Гистограммы» и «Ряды») */
+function fieldCaption(fid){
+  const p = FIELDS.features.find(f=>f.properties.field_id===+fid);
+  if(!p) return "";
+  const a = p.properties;
+  return `<b>Поле №${a.field_id}</b> · ${CUL_RU[a.Culture]||a.Culture} · ${a.Area_ha} га
+          · кадастр <span class="cadv">${a.Cad_number}</span>`;
 }
 function fillIndexSelect(sel){
   META.indices.forEach(i=>{const o=document.createElement("option");o.value=i;o.textContent=i;sel.appendChild(o);});
@@ -283,6 +299,7 @@ async function onHistField(){ await onHistIndex(); }
 async function onHistIndex(){
   const fid=$("h-field").value, idx=$("h-index").value;
   const h = await getHist(fid);
+  $("h-cap").innerHTML = fieldCaption(fid);
   const sel = $("h-date"); sel.innerHTML="";
   const dates = h[idx] ? Object.keys(h[idx].dates).sort() : [];
   dates.forEach(d=>{const o=document.createElement("option");o.value=d;o.textContent=fmtD(d);sel.appendChild(o);});
@@ -342,6 +359,7 @@ function initSeries(){
 }
 function drawSeries(){
   const fid=$("s-field").value, idx=$("s-index").value;
+  $("s-cap").innerHTML = fieldCaption(fid);
   const s=SERIES[fid]; if(!s||!s[idx]) return;
   const L=s.dates.map(fmtD);
   if(sChart) sChart.destroy();
