@@ -11,7 +11,7 @@ const LAYER_ORDER = ["ndvi","ndvi_contrast","ndmi","false","natural"];
 
 let META, FIELDS, SERIES, CHIPS;
 let map, baseLayers = {}, chipLayers = [], fieldLayer;
-let curLayer = "ndvi", curDate = null, selField = null;
+let curLayer = "ndvi", curDate = null, selField = null, chipOpacity = .96;
 let dateList = [];
 const histCache = {};
 let hChart, hSeason, sChart, sCv;
@@ -57,6 +57,14 @@ function initMap(){
   map.fitBounds(fieldLayer.getBounds().pad(0.08));
   document.querySelectorAll("#base-btns .chip").forEach(b=>b.onclick=()=>setBase(b.dataset.base,b));
   loadWayback();
+  map.on("click", e=>{
+    const r = samplePixel(e.latlng);
+    if(r) L.popup({className:"px-pop", closeButton:false, offset:[0,-4]})
+           .setLatLng(e.latlng).setContent(r.html).openOn(map);
+  });
+  const op = $("opa");
+  op.oninput = ()=>{ chipOpacity = op.value/100; $("opa-v").textContent = op.value+"%";
+                     chipLayers.forEach(l=>l.setOpacity(chipOpacity)); };
 }
 
 function setBase(name, btn){
@@ -101,12 +109,53 @@ function refreshChips(){
     const d = chipDateFor(+fid); if(!d) return;
     const url = `data/chips/${fid}/${d}_${curLayer}.png`;
     const b = c.bounds; // [s,w,n,e]
-    const ov = L.imageOverlay(url, [[b[0],b[1]],[b[2],b[3]]], {opacity:.96, interactive:false});
+    const ov = L.imageOverlay(url, [[b[0],b[1]],[b[2],b[3]]], {opacity:chipOpacity, interactive:false});
+    ov.fid = +fid; ov.chipDate = d;
     ov.addTo(map); chipLayers.push(ov);
   });
   fieldLayer.bringToFront();
   updateFieldListValues();
   if(selField) showCard(selField);
+}
+
+/* значение пикселя по клику (ВП-14): цвет из PNG → значение через палитру */
+function nearestLut(lut, r, g, b){
+  let bi=0, bd=1e9;
+  for(let i=0;i<lut.length;i++){
+    const d=(lut[i][0]-r)**2+(lut[i][1]-g)**2+(lut[i][2]-b)**2;
+    if(d<bd){bd=d;bi=i;}
+  }
+  return {i:bi, dist:Math.sqrt(bd)};
+}
+function samplePixel(latlng){
+  const lm = META.layers[curLayer];
+  for(let k=chipLayers.length-1;k>=0;k--){
+    const ov = chipLayers[k], b = ov.getBounds();
+    if(!b.contains(latlng)) continue;
+    const img = ov.getElement();
+    if(!img || !img.complete || !img.naturalWidth) continue;
+    const w=img.naturalWidth, h=img.naturalHeight;
+    const x=Math.floor((latlng.lng-b.getWest())/(b.getEast()-b.getWest())*w);
+    const y=Math.floor((b.getNorth()-latlng.lat)/(b.getNorth()-b.getSouth())*h);
+    if(x<0||y<0||x>=w||y>=h) continue;
+    const c=document.createElement("canvas"); c.width=w; c.height=h;
+    const ctx=c.getContext("2d",{willReadFrequently:true}); ctx.drawImage(img,0,0);
+    const p=ctx.getImageData(x,y,1,1).data;
+    if(p[3]===0) continue;                       // вне границы поля
+    const f=FIELDS.features.find(f=>f.properties.field_id===ov.fid);
+    const nm=f?`Поле №${ov.fid} · ${CUL_RU[f.properties.Culture]||f.properties.Culture}`:`Поле №${ov.fid}`;
+    if(!lm.legend){                              // RGB-композит — значения нет
+      return {html:`<b>${nm}</b><div class="sub">${lm.name} · ${fmtD(ov.chipDate)} · RGB ${p[0]},${p[1]},${p[2]}</div>`};
+    }
+    const lut=META.cmaps[lm.legend.cmap];
+    const {i,dist}=nearestLut(lut,p[0],p[1],p[2]);
+    let vmin=lm.legend.min, vmax=lm.legend.max, note="";
+    if(vmin===null){ vmin=0; vmax=1; note=" (доля диапазона окна)"; }
+    const val=vmin+(vmax-vmin)*i/255;
+    const label=curLayer==="ndmi"?"NDMI":"NDVI";
+    return {html:`<b>${label} ${val.toFixed(3)}</b><div class="sub">${nm}<br>${fmtD(ov.chipDate)} · пиксель 10 м${note}${dist>12?" · цвет приблизительный":""}</div>`};
+  }
+  return null;
 }
 function refreshLegend(){
   const lm = META.layers[curLayer], lg = $("legend");
@@ -168,10 +217,14 @@ function initFieldList(){
   });
   updateFieldListValues();
 }
+function listIndex(){ return curLayer==="ndmi" ? "NDMI" : "NDVI"; }
 function updateFieldListValues(){
+  const idx = listIndex();
+  $("f-count").textContent = `· ${FIELDS.features.length} · ${idx}`;
   document.querySelectorAll(".f-item .v").forEach(sp=>{
-    const r = valAt(+sp.dataset.fid, "NDVI", curDate);
+    const r = valAt(+sp.dataset.fid, idx, curDate);
     sp.textContent = r && r.v!=null ? r.v.toFixed(2) : "·";
+    sp.title = r ? `${idx} на ${fmtD(r.date)} · чисто ${r.clear}%` : "нет данных на эту дату";
   });
 }
 function selectField(fid, zoom){
@@ -191,6 +244,7 @@ function showCard(fid){
   const p = f.properties;
   const nd = valAt(fid,"NDVI",curDate), nm = valAt(fid,"NDMI",curDate);
   const impl = META.implausible.filter(x=>x.field_id===fid);
+  const cd = chipDateFor(fid);
   const card = $("f-card");
   card.classList.remove("hidden");
   card.innerHTML = `
@@ -203,6 +257,7 @@ function showCard(fid){
       <div class="cell"><div class="l">CV равном.</div><div class="v">${nd&&nd.cv!=null?nd.cv.toFixed(2):"—"}</div></div>
       <div class="cell"><div class="l">дата · чисто</div><div class="v" style="font-size:12px">${nd?fmtD(nd.date):"—"} · ${nd?nd.clear+"%":""}</div></div>
     </div>
+    ${cd&&cd!==curDate?`<div class="chip-date">снимок на карте: ${fmtD(cd)} (на ${fmtD(curDate)} поле закрыто облаком)</div>`:""}
     ${impl.length?`<div class="warnbox">⚠ ${impl.length} дат с неправдоподобными значениями (${[...new Set(impl.map(x=>x.implausible))].join("; ")}) — вероятно, граница поля лежит не на посеве.</div>`:""}
     <div class="links">
       <button id="go-hist">Гистограммы поля →</button>

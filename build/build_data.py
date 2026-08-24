@@ -108,11 +108,18 @@ def main():
         (SITE / "data" / "hist" / f"{int(fid)}.json").write_text(
             json.dumps(obj, ensure_ascii=False), encoding="utf-8")
 
+    # палитры (256 RGB) — чтобы сайт мог обратно перевести цвет пикселя в значение
+    from matplotlib import cm as _cm
+    cmaps = {}
+    for nm in ("RdYlGn", "BrBG"):
+        f = _cm.get_cmap(nm)
+        cmaps[nm] = [[int(round(c * 255)) for c in f(i / 255.0)[:3]] for i in range(256)]
+
     # meta.json
     dates_all = sorted(clear.date.unique())
     meta = {"updated": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
             "period": [dates_all[0], dates_all[-1]], "n_fields": int(gdf.field_id.max()),
-            "indices": INDICES, "interp": INTERP, "layers": LAYERS_META,
+            "indices": INDICES, "interp": INTERP, "layers": LAYERS_META, "cmaps": cmaps,
             "implausible": stats[stats.implausible.notna()][["field_id", "date", "implausible"]]
                              .to_dict("records")}
     (SITE / "data" / "meta.json").write_text(

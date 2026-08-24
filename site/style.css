@@ -45,6 +45,16 @@ select{background:var(--panel-solid);border:1px solid var(--line);color:var(--in
 .legend .bar{height:10px;border-radius:5px;margin-bottom:3px}
 .legend .lab{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--ink3)}
 .interp{margin-top:9px;font-size:12.3px;line-height:1.55;color:var(--ink2)}
+.opa-row{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:11.5px;color:var(--ink3)}
+.opa-row input[type=range]{flex:1;accent-color:var(--acc);height:3px}
+.opa-v{font-family:var(--mono);min-width:32px;text-align:right}
+.leaflet-image-layer{image-rendering:pixelated}
+.px-pop .leaflet-popup-content-wrapper{background:var(--panel-solid);color:var(--ink);border:1px solid var(--line);border-radius:8px}
+.px-pop .leaflet-popup-tip{background:var(--panel-solid);border:1px solid var(--line)}
+.px-pop .leaflet-popup-content{margin:9px 12px;font-family:var(--sans);font-size:12.5px}
+.px-pop b{font-family:var(--mono);color:var(--acc);font-size:14px}
+.px-pop .sub{color:var(--ink3);font-size:11.5px;margin-top:3px}
+.chip-date{margin-top:6px;font-size:11.5px;color:var(--warn);font-family:var(--mono)}
 
 .f-list{overflow:auto;margin:0 -6px;padding:0 6px}
 .f-item{display:flex;align-items:center;gap:8px;padding:6px 7px;border-radius:7px;cursor:pointer;font-size:13px}
