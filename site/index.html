@@ -22,6 +22,15 @@
     <button class="tab" data-tab="series">Ряды</button>
   </nav>
   <div class="upd" id="updated"></div>
+  <div class="exp-wrap">
+    <button class="exp-btn" id="exp-btn" title="Скачать данные в CSV">⤓ Экспорт CSV</button>
+    <div class="exp-menu hidden" id="exp-menu">
+      <button data-exp="means">Средние по всем полям<span>поле × дата × 16 индексов</span></button>
+      <button data-exp="full">Полная статистика<span>+ персентили, CV, облачность</span></button>
+      <button data-exp="hist">Гистограммы<span>все поля, длинный формат</span></button>
+      <div class="exp-note">разделитель «;», для Excel</div>
+    </div>
+  </div>
 </header>
 
 <main>

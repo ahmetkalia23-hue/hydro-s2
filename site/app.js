@@ -36,8 +36,99 @@ async function boot(){
   dateList = [...ds].sort();
   curDate = dateList[dateList.length-1];
   initMap(); initLayersPanel(); initDates(); initFieldList();
-  initTabs(); initHist(); initSeries();
+  initTabs(); initHist(); initSeries(); initExport();
   refreshChips(); refreshLegend();
+}
+
+/* ── экспорт CSV (Excel: разделитель «;», десятичная запятая, BOM) ── */
+const PCT = ["p05","p25","p50","p75","p95"];
+function csvCell(v){
+  if(v===null||v===undefined) return "";
+  if(typeof v==="number") return String(v).replace(".",",");
+  const s=String(v);
+  return /[;"\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function download(name, rows){
+  const body = rows.map(r=>r.map(csvCell).join(";")).join("\r\n");
+  const blob = new Blob(["﻿"+body], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();}, 0);
+}
+function fieldMeta(fid){
+  const p = FIELDS.features.find(f=>f.properties.field_id===+fid);
+  return p ? p.properties : {};
+}
+function stamp(){ return META.period[1]; }
+
+function exportMeans(){
+  const head = ["field_id","cadastre","culture","area_ha","date","clear_pct", ...META.indices];
+  const rows = [head];
+  Object.keys(SERIES).sort((a,b)=>a-b).forEach(fid=>{
+    const s=SERIES[fid], m=fieldMeta(fid);
+    s.dates.forEach((d,i)=>rows.push([+fid, m.Cad_number, CUL_RU[m.Culture]||m.Culture, m.Area_ha,
+      d, s.clear_pct[i], ...META.indices.map(ix=>s[ix]?s[ix].mean[i]:null)]));
+  });
+  download(`hydrosat_means_${stamp()}.csv`, rows);
+}
+
+function exportFull(){
+  const head = ["field_id","cadastre","culture","area_ha","date","clear_pct"];
+  META.indices.forEach(ix=>{ head.push(ix+"_mean"); PCT.forEach(p=>head.push(ix+"_"+p)); head.push(ix+"_cv"); });
+  const rows=[head];
+  Object.keys(SERIES).sort((a,b)=>a-b).forEach(fid=>{
+    const s=SERIES[fid], m=fieldMeta(fid);
+    s.dates.forEach((d,i)=>{
+      const r=[+fid, m.Cad_number, CUL_RU[m.Culture]||m.Culture, m.Area_ha, d, s.clear_pct[i]];
+      META.indices.forEach(ix=>{
+        const e=s[ix]||{};
+        r.push(e.mean?e.mean[i]:null);
+        PCT.forEach(p=>r.push(e[p]?e[p][i]:null));
+        r.push(e.cv?e.cv[i]:null);
+      });
+      rows.push(r);
+    });
+  });
+  download(`hydrosat_stats_full_${stamp()}.csv`, rows);
+}
+
+async function exportHist(){
+  const rows=[["field_id","cadastre","culture","date","index","grid_m","bin_lo","bin_hi","count","freq"]];
+  const ids = FIELDS.features.map(f=>f.properties.field_id).sort((a,b)=>a-b);
+  for(const fid of ids){
+    const h = await getHist(fid), m = fieldMeta(fid);
+    for(const ix of Object.keys(h)){
+      const e=h[ix];
+      for(const d of Object.keys(e.dates).sort()){
+        const cnt=e.dates[d], tot=cnt.reduce((a,b)=>a+b,0)||1;
+        cnt.forEach((c,k)=>{ if(!c) return;
+          const lo=+(e.lo+e.step*k).toFixed(4), hi=+(e.lo+e.step*(k+1)).toFixed(4);
+          rows.push([fid, m.Cad_number, CUL_RU[m.Culture]||m.Culture, d, ix, e.grid_m,
+                     lo, hi, c, +(c/tot).toFixed(5)]);
+        });
+      }
+    }
+  }
+  download(`hydrosat_histograms_${stamp()}.csv`, rows);
+}
+
+function initExport(){
+  const btn=$("exp-btn"), menu=$("exp-menu");
+  btn.onclick = e => { e.stopPropagation(); menu.classList.toggle("hidden"); };
+  document.addEventListener("click", ()=>menu.classList.add("hidden"));
+  menu.onclick = async e => {
+    const b = e.target.closest("button[data-exp]"); if(!b) return;
+    e.stopPropagation(); menu.classList.add("hidden");
+    btn.classList.add("busy"); btn.textContent = "⤓ Готовлю…";
+    try{
+      if(b.dataset.exp==="means") exportMeans();
+      else if(b.dataset.exp==="full") exportFull();
+      else await exportHist();
+    } finally {
+      btn.classList.remove("busy"); btn.textContent = "⤓ Экспорт CSV";
+    }
+  };
 }
 
 /* ── карта ── */
