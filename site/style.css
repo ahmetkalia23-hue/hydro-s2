@@ -93,6 +93,16 @@ select{background:var(--panel-solid);border:1px solid var(--line);color:var(--in
 .hist-meta{font-family:var(--mono);font-size:12.5px;color:var(--ink2);margin-bottom:8px}
 .hist-meta b{color:var(--acc)}
 
+.expl{margin-top:18px;background:var(--panel-solid);border:1px solid var(--line);
+  border-radius:10px;padding:16px 18px 18px}
+.expl-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.expl h4{margin:0 0 6px;font-size:13.5px;font-weight:600;color:var(--acc)}
+.expl p{margin:0 0 8px;font-size:13px;line-height:1.6;color:var(--ink2);max-width:60ch}
+.expl ul{margin:0;padding-left:17px}
+.expl li{font-size:13px;line-height:1.55;color:var(--ink2);margin-bottom:5px}
+.expl b{color:var(--ink);font-weight:600}
+.expl p.acc{color:var(--ink);border-left:2px solid var(--acc);padding-left:10px;margin-top:10px}
+@media (max-width:760px){.expl-grid{grid-template-columns:1fr}}
 .leaflet-bar a{background:var(--panel-solid);color:var(--ink2);border-color:var(--line)}
 .leaflet-bar a:hover{background:#222b30}
 .leaflet-control-attribution{background:#10161acc!important;color:var(--ink3)!important;font-size:10px!important}
