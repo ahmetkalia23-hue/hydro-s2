@@ -60,9 +60,14 @@ def main():
     wgs = gdf.to_crs(4326)
     scenes = core.search_scenes(core.aoi_of(wgs), dt_from, dt_to)
     dates = sorted({s["date"] for s in scenes})
-    fresh = [d for d in dates if not any((f, d) in have_pairs for f in gdf.field_id)]
-    print(f"сцен {len(scenes)} · дат {len(dates)} · из них новых {len(fresh)}"
-          + (f" ({', '.join(fresh)})" if fresh else ""))
+    if args.dt_from:
+        # период задан явно — считаем заново всё в нём (пересчёт по требованию)
+        fresh = dates
+        print(f"сцен {len(scenes)} · дат {len(dates)} · пересчёт всего периода")
+    else:
+        fresh = [d for d in dates if not any((f, d) in have_pairs for f in gdf.field_id)]
+        print(f"сцен {len(scenes)} · дат {len(dates)} · из них новых {len(fresh)}"
+              + (f" ({', '.join(fresh)})" if fresh else ""))
 
     if not fresh:
         print(f"новых дат нет — данные актуальны ({time.time()-t0:.0f}s)")
