@@ -38,7 +38,9 @@ SHAPE   = str(ROOT / "data" / "fields" / "fields.shp")
 STATS   = str(ROOT / "data" / "stats.parquet")
 SITE    = ROOT / "site"
 CHIPS   = SITE / "data" / "chips"
-DT_FROM, DT_TO = "2026-03-01", "2026-08-24"
+# Период поиска сцен НЕ задаётся константой: он выводится из самих данных
+# (даты, для которых нужны вырезки). Иначе при инкрементальном обновлении карта
+# застревает на дате, зашитой в код, хотя ряды и гистограммы уже свежие.
 PAD     = 30.0    # запас окна вокруг поля, м (чип обрезается по границе альфой)
 RES     = 10.0
 WORKERS = 14
@@ -50,7 +52,7 @@ CM_NDVI = matplotlib.colormaps["RdYlGn"]
 CM_NDMI = matplotlib.colormaps["BrBG"]
 
 
-def search_scenes(geom_wgs):
+def search_scenes(geom_wgs, DT_FROM, DT_TO):
     feats, seen = [], set()
     body = {"collections": ["sentinel-2-l2a"], "intersects": mapping(geom_wgs),
             "datetime": f"{DT_FROM}T00:00:00Z/{DT_TO}T23:59:59Z", "limit": 100,
@@ -230,7 +232,9 @@ def main():
 
     west = wgs[wgs.geometry.centroid.x < 70]; east = wgs[wgs.geometry.centroid.x >= 70]
     hulls = [g.union_all().convex_hull.buffer(0.01) for g in (west.geometry, east.geometry) if len(g)]
-    scenes = search_scenes(unary_union(hulls))
+    # диапазон — по датам, для которых реально нужны вырезки
+    dt_from = min(need.date); dt_to = max(need.date)
+    scenes = search_scenes(unary_union(hulls), dt_from, dt_to)
     scenes = [s for s in scenes if (s["tile"], s["date"]) in jobs_by_tiledate]
     print(f"Сцен к обработке: {len(scenes)}")
 
