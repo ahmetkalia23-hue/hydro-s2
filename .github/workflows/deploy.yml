@@ -22,7 +22,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # ref: main обязателен. По умолчанию checkout берёт SHA, на котором
+      # стартовал прогон; при вызове из update-data коммит со свежими данными
+      # делается ПОЗЖЕ в том же прогоне, и сайт публиковался бы без него.
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
