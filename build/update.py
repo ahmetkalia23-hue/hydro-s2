@@ -107,6 +107,11 @@ def main():
 
     stats_out = (pd.concat([stats, new], ignore_index=True) if len(stats) else new)
     stats_out = core.dedup_stats(stats_out)
+    # атрибуты поля (кадастр, культура, площадь) приходят из шейпа, а не из сцены:
+    # без этого у строк за новые даты они остались бы пустыми
+    attrs = ["field_key", "Cad_number", "Culture", "Area_ha"]
+    stats_out = stats_out.drop(columns=[c for c in attrs if c in stats_out.columns])
+    stats_out = gdf[["field_id"] + attrs].merge(stats_out, on="field_id")
     hist = pd.read_parquet(core.HIST_PARQUET) if core.HIST_PARQUET.exists() else pd.DataFrame()
     hist_out = (pd.concat([hist, newh], ignore_index=True) if len(hist) else newh)
     hist_out = hist_out.drop_duplicates(["field_id", "date", "index", "grid_m", "bin_lo"],
